@@ -1,8 +1,8 @@
 --Configuration. Edit as needed.
 local bitcoin = {
 	rpc = {
-		username = "Rena", --the RPC username set in your bitcoin.conf
-		password = "BqFM7yO7pERwwl8j1_rq37oxK", --and the password
+		username = "some_name", --the RPC username set in your bitcoin.conf
+		password = "some_password", --and the password
 		host = "localhost", --the host to connect to
 		port = 8332, --the port for RPC connections
 	},
