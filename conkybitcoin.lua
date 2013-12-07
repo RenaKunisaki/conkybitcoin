@@ -199,7 +199,7 @@ function conky_mtgox(curname, ...)
 	if now - currency.last_update >= bitcoin.mtgox.update_interval then
 		currency.last_update = now --even if request fails
 		local text, status = http.request(url)
-		if (not status) or (status >= 300) then
+		if (not status) or (not tonumber(status)) or (status >= 300) then
 			return "HTTP " .. tostring(status)
 		end
 
