@@ -24,6 +24,14 @@ local bitcoin = {
 local json = require('json') --http://json.luaforge.net/
 local rpc  = require('json.rpc')
 local http = require('socket.http') --http://luaforge.net/projects/luasocket/
+local ssl = require('ssl') --https://github.com/LuaDist/luasec
+--[[ these should all be installable with LuaRocks:
+sudo luarocks install json4lua
+sudo luarocks install luasocket
+sudo luarocks install luasec
+however, I had to do:
+sudo luarocks install luasec OPENSSL_LIBDIR=/usr/lib/x86_64-linux-gnu/ ]]
+
 unpack = unpack or table.unpack --Lua 5.1 and 5.2 compat
 
 
@@ -53,6 +61,42 @@ end
 local function tremove(tbl, idx)
 	if tbl.n and tbl.n > 0 then tbl.n = tbl.n - 1 end
 	return table.remove(tbl, idx)
+end
+
+
+--"create" method for https sockets. wraps them in a proxy object,
+--which takes care of SSL handshakes.
+local function create_https()
+	local params = {
+		mode     = 'client',
+		protocol = 'sslv23',
+		cafile   = '/etc/ssl/certs/ca-certificates.crt',
+		verify   = 'peer',
+		options  = 'all',
+	}
+
+	local try = socket.try
+	local sock = { base = try(socket.tcp()) }
+
+	local function idx(self, key) --proxy's __index method.
+		--we have to give functions the actual socket object,
+		--not this proxy table.
+		local val = rawget(self, 'base')[key]
+		if type(val) ~= 'function' then return val end
+		return function(proxy, ...)
+			local base = proxy.base
+			return base[key](base,...)
+		end
+	end
+
+	function sock:connect(host, port)
+		socket.try(self.base:connect(host, port))
+		self.base = socket.try(ssl.wrap(self.base, params))
+		socket.try(self.base:dohandshake())
+		return 1
+	end
+
+	return setmetatable(sock, {__index = idx})
 end
 
 
@@ -193,19 +237,29 @@ function conky_mtgox(curname, ...)
 
 	bitcoin.mtgox.currency[curname] = bitcoin.mtgox.currency[curname] or {}
 	local currency = bitcoin.mtgox.currency[curname]
-	local url = 'https://data.mtgox.com/api/2/BTC' .. curname ..'/money/ticker'
+	local url = 'https://data.mtgox.com:443/api/2/BTC' ..
+		curname .. '/money/ticker'
 
 	currency.last_update = currency.last_update or 0
 	if now - currency.last_update >= bitcoin.mtgox.update_interval then
 		currency.last_update = now --even if request fails
-		local text, status = http.request(url)
-		if (not status) or (not tonumber(status))
+
+		local response_body = {}
+		local ok, status, headers, statusline = http.request {
+			url = url,
+			create = create_https,
+			sink = ltn12.sink.table(response_body), --required with this method
+		}
+		local text = table.concat(response_body)
+
+		if (not ok) or (not status) or (not tonumber(status))
 		or (tonumber(status) >= 300) then
 			return "HTTP " .. tostring(status)
 		end
 
 		local ok, data = pcall(json.decode, text)
-		if ok then for k, v in pairs(data.data) do currency[k] = v end
+		if ok and type(data) == 'table' then
+			for k, v in pairs(data.data) do currency[k] = v end
 		else return tostring(data)
 		end
 	end

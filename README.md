@@ -1,6 +1,7 @@
 Script to display [Bitcoin](http://bitcoin.org) and [MtGox](https://www.mtgox.com) info in [Conky](http://conky.sourceforge.net).
 
-This script requires [Lua 5.1](http://www.lua.org/), [JSON4Lua](http://json.luaforge.net) and [LuaSocket](http://luaforge.net/projects/luasocket).
+This script requires [Lua 5.1](http://www.lua.org/), [JSON4Lua](http://json.luaforge.net), [LuaSocket](http://luaforge.net/projects/luasocket), and [LuaSec](https://github.com/LuaDist/luasec).
+These can be installed using [LuaRocks](http://luarocks.org/).
 
 To use this script, add a line to `~/.conkyrc` to load it:
 
